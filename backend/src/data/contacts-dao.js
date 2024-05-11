@@ -1,7 +1,4 @@
-import { v4 as uuid } from "uuid";
-import { createInitialContacts } from "./initial-contacts.js";
-
-const contacts = await createInitialContacts();
+import { Contact } from "./schema.js";
 
 /**
  * Retrieves all contacts from the database.
@@ -9,59 +6,45 @@ const contacts = await createInitialContacts();
  * @returns a list of contacts
  */
 export async function retrieveContacts() {
-  return contacts;
+  return await Contact.find();
 }
 
 /**
- * Creates a new contact.
+ * Creates a new contact in the database.
  *
- * @param contact the contact to create. Must have a name. optionally a phoneNumber and funFact.
- * @returns the newly created contact, including a uniquely generated _id value.
- * @throws error if the contact has no name, or a non-unique name.
+ * @param contact the contact to add; should not include an _id, this will be auto-generated.
+ * @returns the contact created by the database, including _id.
+ * @throws error if trying to add a contact with a duplicate name. The error will have a keyPattern.name prop.
  */
 export async function createContact(contact) {
-  if (!contact?.name) throw "New contacts must have a name.";
-
-  const existingContact = contacts.find((c) => c.name === contact.name);
-  if (existingContact) throw `The name '${contact.name}' is already taken.`;
-
-  const dbContact = { _id: uuid(), ...contact };
-  contacts.push(dbContact);
+  const dbContact = new Contact(contact);
+  await dbContact.save();
   return dbContact;
 }
 
 /**
- * Updates the contact with the given _id.
- * @param id the id to search
- * @param contact the update info
- * @returns true if a contact was updated, false otherwise.
- * @throws error if trying to update the contact's name to another name that's already taken.
+ * Updates a contact with the given id.
+ *
+ * @param id the id of the contact to update.
+ * @param contact the contact info to update for the matching contact.
+ * @returns true if a contact with matching _id was found and updated, false otherwise.
+ * @throws error if trying to update a contact with a name that's already taken.
+ *         The error will have a keyPattern.name prop.
+ * @throws error if an invalid format for id is supplied.
+ *         The error's value prop will be equal to the supplied id.
  */
 export async function updateContact(id, contact) {
-  const index = contacts.findIndex((c) => c._id === id);
-  if (index < 0) return false;
-
-  delete contact._id; // No overwriting the id!
-
-  // Check for duplicate name if required
-  if (contact?.name) {
-    const existingName = contacts.find((c) => c._id !== id && c.name === contact.name);
-    if (existingName) throw `The name '${contact.name}' is already taken.`;
-  }
-
-  contacts[index] = { ...contacts[index], ...contact };
-
-  return true;
+  const dbContact = await Contact.findByIdAndUpdate(id, contact);
+  return !!dbContact;
 }
 
 /**
- * Deletes the contact with the given id, if any.
+ * Deletes the contact with the given id, if it exists.
  *
- * @param id the id to search
+ * @param id the id of the cotnact to delete.
+ * @throws error if an invalid format for id is supplied.
+ *         The error's value prop will be equal to the supplied id.
  */
 export async function deleteContact(id) {
-  const index = contacts.findIndex((c) => c._id === id);
-  if (index < 0) return;
-
-  contacts.splice(index, 1);
+  return await Contact.deleteOne({ _id: id });
 }
